@@ -11,12 +11,11 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{
   font-family:'Roboto',sans-serif;
-  background:#0d0d0d;
-  color:#f0f0f0;
-  overflow:hidden; /* no scroll in home */
+  background:#0d0d0d;color:#f0f0f0;
+  overflow:hidden; /* no scroll on home */
 }
 
-/* Intro */
+/* INTRO */
 #intro{
   position:fixed;top:0;left:0;width:100%;height:100%;
   background:#000;color:#00ffff;
@@ -26,15 +25,19 @@ html,body{
   transition:opacity 1s ease;
 }
 
-/* Home (Main Menu) */
+/* HOME */
 #home{
-  position:fixed;
-  top:0;left:0;width:100%;height:100vh;
-  display:flex;flex-direction:column;
-  justify-content:center;align-items:center;
-  background:#0d0d0d;
-  z-index:100;
-  transition:opacity 0.8s ease, transform 0.8s ease;
+  position:fixed;top:0;left:0;width:100%;height:100vh;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  background:#0d0d0d;z-index:100;
+  transition:opacity .8s ease;
+}
+#home h2{
+  color:#00ffff;
+  font-size:2rem;
+  margin-bottom:30px;
+  text-shadow:0 0 15px #00ffff,0 0 30px #00ffff;
+  transition:opacity .6s ease;
 }
 #home button{
   padding:15px 40px;font-size:22px;
@@ -44,18 +47,26 @@ html,body{
 }
 #home button:hover{background:#00ffff;color:#000;}
 
-/* Section Pages */
+/* SECTIONS */
 .section{
-  position:fixed;
-  top:0;left:0;width:100%;height:100vh;
+  position:fixed;top:0;left:0;width:100%;height:100vh;
   background:#0d0d0d;
   opacity:0;pointer-events:none;
-  transition:opacity 0.8s ease;
+  transition:opacity .8s ease;
 }
 .section.active{
   opacity:1;pointer-events:auto;
   z-index:150;
 }
+
+/* BACK BUTTON */
+.back-btn{
+  position:fixed;top:20px;left:20px;
+  background:#00ffff;color:#000;border:none;
+  padding:10px 18px;border-radius:8px;
+  font-weight:bold;cursor:pointer;z-index:300;
+}
+.back-btn:hover{background:#00b3b3;}
 
 /* SHOP */
 #shopSection{
@@ -63,64 +74,55 @@ html,body{
   max-height:100vh;overflow-y:auto;padding:20px;
 }
 .category-title{
-  font-size:1.4rem;font-weight:bold;
-  color:#ff9900;margin-left:10px;margin-bottom:10px;
-  opacity:0;transform:translateY(-20px);
-  transition:.5s;
+  font-size:1.4rem;font-weight:bold;color:#ff9900;margin-left:10px;margin-bottom:10px;
+  opacity:0;transform:translateY(-20px);transition:.5s;
 }
 .category-title.show{opacity:1;transform:translateY(0);}
 .product-card{
   background:#1a1a1a;padding:20px;border-radius:12px;
-  box-shadow:0 5px 15px rgba(0,0,0,.5);
-  text-align:left;transition:.3s,opacity .5s;
-  border-left:4px solid #00ffff;margin-left:10px;
+  border-left:4px solid #00ffff;
   opacity:0;transform:translateX(-20px);
-  cursor:pointer;
+  transition:opacity .5s, transform .5s;
+  cursor:pointer;margin-left:10px;
 }
 .product-card.show{opacity:1;transform:translateX(0);}
-.product-card h3{margin-bottom:8px;color:#00ffff;font-size:1.1rem;}
-.product-card p{font-size:14px;color:#ccc;}
+.product-card h3{color:#00ffff;margin-bottom:8px;}
+.product-card p{color:#ccc;font-size:14px;}
 
-/* Games */
+/* GAMES */
 #gamesSection{
-  display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
-  gap:20px;
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:20px;
 }
 .game-btns{display:flex;gap:15px;}
 .game-btns button{
-  padding:10px 20px;background:#00ffff;color:#000;
-  border:none;border-radius:8px;
+  padding:10px 20px;background:#00ffff;
+  color:#000;border:none;border-radius:8px;
   cursor:pointer;font-size:16px;transition:.3s;
 }
 .game-btns button:hover{background:#00b3b3;}
 
-/* Back Button */
-.back-btn{
-  position:fixed;top:20px;left:20px;
-  background:#00ffff;color:#000;
-  border:none;border-radius:8px;padding:8px 15px;
-  font-weight:bold;cursor:pointer;z-index:300;
-}
-.back-btn:hover{background:#00b3b3;}
-
-/* Popup */
+/* POPUP */
 #popupNote{
   position:fixed;top:50%;left:50%;
   transform:translate(-50%,-50%);
   background:rgba(0,0,0,0.95);
-  border:2px solid #00ffff;
-  padding:25px 35px;border-radius:12px;
-  font-size:16px;color:#00ffff;text-align:center;
-  z-index:4000;opacity:0;pointer-events:none;
-  transition:opacity 0.5s ease;
+  border:2px solid #00ffff;padding:25px 35px;border-radius:12px;
+  color:#00ffff;z-index:4000;
+  opacity:0;pointer-events:none;transition:.4s;
 }
-#popupNote.show{opacity:1;pointer-events:auto;}
+#popupNote.show{
+  opacity:1;pointer-events:auto;
+}
 
+/* Scrollbar */
 #shopSection::-webkit-scrollbar{width:8px;}
-#shopSection::-webkit-scrollbar-track{background:transparent;}
-#shopSection::-webkit-scrollbar-thumb{background:#00ffff;border-radius:10px;}
-#shopSection::-webkit-scrollbar-thumb:hover{background:#00b3b3;}
+#shopSection::-webkit-scrollbar-thumb{
+  background:#00ffff;border-radius:10px;
+}
+#shopSection::-webkit-scrollbar-thumb:hover{
+  background:#00b3b3;
+}
 </style>
 </head>
 <body>
@@ -130,10 +132,11 @@ html,body{
 
 <!-- HOME -->
 <div id="home">
+  <h2 id="headline">1600+ Cheap Robux in stock</h2>
   <button onclick="openSection('shop')">Shop</button>
   <button onclick="openSection('games')">Games</button>
 </div>
-<script type="text/javascript">window.$crisp=[];window.CRISP_WEBSITE_ID="49cbe588-16a0-40ad-b50b-844419c11121";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();</script>
+
 <!-- SHOP -->
 <div id="shopSection" class="section">
   <button class="back-btn" onclick="goHome()">← Home</button>
@@ -144,21 +147,21 @@ html,body{
   <div class="category-title">Brainrots</div>
   <div class="product-card"><h3>Los Combination</h3><p>Price: £9</p></div>
   <div class="product-card"><h3>La Grande Combination</h3><p>Price: £7</p></div>
-  <div class="product-card"><h3>Brainrots 100m–500m Available</h3><p>Price:</p></div>
+  <div class="product-card"><h3>Brainrots 100m–500m Available</h3><p>Price:Offer?!?</p></div>
 
   <div class="category-title">Fun</div>
-  <div class="product-card"><h3>Pen Watergun</h3><p>Pen that can shoot water with pressure</p><p>Price: £3.99</p></div>
+  <div class="product-card"><h3>Pen Watergun</h3><p>Pen that can shoot water with pressure (3 PENS) </p><p>Price: £17.99</p></div>
 
   <div class="category-title">Website</div>
-  <div class="product-card"><h3>Your Website</h3><p>Your own customized website with your domain name</p><p>Price: £20</p></div>
+  <div class="product-card"><h3>Your Website</h3><p>Your own customized website</p><p>Price: £10-15</p></div>
 
   <div class="category-title">Roblox Game</div>
-  <div class="product-card"><h3>Your Roblox Game</h3><p>Your own Roblox game with your customization</p><p>Price: £10</p></div>
+  <div class="product-card"><h3>Your Roblox Game</h3><p>Fully customized</p><p>Price: £10</p></div>
 
   <div class="category-title">Others</div>
-  <div class="product-card"><h3>99 Nights in Forest</h3><p>Price: £2.99</p></div>
-  <div class="product-card"><h3>Steal a Brainrot (Sab Private Server)</h3><p>Price: £1.20 / month</p></div>
-  <div class="product-card"><h3>Grow a Garden Pets</h3><p>Price: £2</p></div>
+  <div class="product-card"><h3>99 Nights in Forest H4CKS</h3><p>Price: £2.99</p></div>
+  <div class="product-card"><h3>Steal a Brainrot</h3><p>Sab Private Server</p><p>Price: £1.20/month</p></div>
+  <div class="product-card"><h3>Grow a Garden Pets</h3><p>Price: £2-20</p></div>
 </div>
 
 <!-- GAMES -->
@@ -170,22 +173,79 @@ html,body{
   </div>
 </div>
 
-<!-- Popup -->
-<div id="popupNote">If you want to buy this product, please contact us on Discord User - Mazm3n THANKS</div>
+<!-- POPUP -->
+<div id="popupNote">If you want to buy this product, contact us on Discord: Mazm3n</div>
 
 <script>
+// INTRO
 window.addEventListener("DOMContentLoaded",()=>{
   const intro=document.getElementById("intro");
+
   setTimeout(()=>{
     intro.style.opacity="0";
     setTimeout(()=>intro.style.display="none",1000);
+
+    // start headline AFTER intro
+    setTimeout(()=>startHeadline(),1100);
+
   },3000);
 });
 
+// HEADLINE & COUNT
+function startHeadline(){
+  const headline=document.getElementById("headline");
+
+  const texts=[
+    "1600+ Cheap Robux in stock",
+    "Wanna buy? Contact us in Discord/Snapchat",
+    "100% Trusted Market",
+    "Make sure to feed back to help us improve"
+  ];
+
+  let index=0;
+
+  function countUp(){
+    let num=0;
+    const target=1600;
+    const duration=3000;
+    const steps=60;
+    const inc=target/steps;
+
+    const interval=setInterval(()=>{
+      num+=inc;
+      if(num>=1600){
+        num=1600;
+        clearInterval(interval);
+      }
+      headline.textContent=Math.floor(num) + "+ Cheap Robux in stock";
+    },duration/steps);
+  }
+
+  countUp();
+
+  setInterval(()=>{
+    headline.style.opacity="0";
+
+    setTimeout(()=>{
+      index=(index+1)%texts.length;
+
+      headline.textContent=texts[index];
+
+      if(index===0) countUp();
+
+      headline.style.opacity="1";
+    },600);
+
+  },5000);
+}
+
+// SECTION OPEN
 function openSection(section){
-  document.body.style.overflow = "hidden"; // prevent home scroll
-  document.getElementById("home").style.opacity="0";
-  document.getElementById("home").style.pointerEvents="none";
+  document.body.style.overflow="hidden";
+
+  const home=document.getElementById("home");
+  home.style.opacity="0";
+  home.style.pointerEvents="none";
 
   const sec=document.getElementById(section+"Section");
   setTimeout(()=>{
@@ -194,29 +254,35 @@ function openSection(section){
   },400);
 }
 
+// BACK HOME
 function goHome(){
-  const sections=document.querySelectorAll(".section");
-  sections.forEach(s=>s.classList.remove("active"));
-  document.getElementById("home").style.opacity="1";
-  document.getElementById("home").style.pointerEvents="auto";
-  document.body.style.overflow="hidden";
+  document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+
+  const home=document.getElementById("home");
+  home.style.opacity="1";
+  home.style.pointerEvents="auto";
 }
 
+// SHOP ANIMATION
 function animateShop(){
   const shop=document.getElementById('shopSection');
   const cats=shop.querySelectorAll('.category-title');
   const cards=shop.querySelectorAll('.product-card');
+
   cats.forEach((c,i)=>setTimeout(()=>c.classList.add('show'),i*200));
   cards.forEach((c,i)=>setTimeout(()=>c.classList.add('show'),i*200+300));
+
   cards.forEach(card=>card.onclick=()=>showPopup());
 }
 
+// POPUP
 function showPopup(){
   const popup=document.getElementById('popupNote');
   popup.classList.add('show');
   setTimeout(()=>popup.classList.remove('show'),4000);
 }
 
+// GAME REDIRECTS
 function redirectGame(game){
   if(game==='minecraft') window.location.href="https://avacaine.github.io/";
   if(game==='1v1') window.location.href="https://funblocked.s3.amazonaws.com/1v1.html";
@@ -224,6 +290,7 @@ function redirectGame(game){
 </script>
 </body>
 </html>
+<script type="text/javascript">window.$crisp=[];window.CRISP_WEBSITE_ID="49cbe588-16a0-40ad-b50b-844419c11121";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();</script>
 
 
 
