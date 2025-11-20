@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cyber Control System v3</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+* { font-family: "Share Tech Mono", monospace; }
+
+/* MATRIX ANIMATION */
+canvas {
+  position: fixed;
+  top:0; left:0;
+  width:100vw; height:100vh;
+  z-index:-1;
+  background:black;
+}
+
+/* GENERAL */
+body {
+  margin: 0;
+  color: #00FF41;
+  overflow: hidden;
+}
+
+.hidden { display:none !important; }
+
+/******** LOGIN *********/
+#loginBox {
+  position:fixed;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  border:2px solid #00FF41;
+  padding:25px;
+  width:300px;
+  background:rgba(0,0,0,0.85);
+  box-shadow:0 0 15px #00FF41;
+  text-align:center;
+}
+
+input, select, textarea {
+  width:100%;
+  padding:8px;
+  margin-top:6px;
+  background:black;
+  border:1px solid #00FF41;
+  color:#00FF41;
+}
+button {
+  width:100%;
+  margin-top:10px;
+  padding:10px;
+  background:black;
+  border:1px solid #00FF41;
+  color:#00FF41;
+}
+button:hover {
+  background:#00FF41;
+  color:black;
+}
+
+/******** PANELS ********/
+.page {
+  height:100vh;
+  display:flex;
+  overflow:hidden;
+}
+
+.sidebar {
+  width:220px;
+  background:rgba(0,0,0,0.75);
+  border-right:2px solid #00FF41;
+  padding:10px;
+}
+.sidebar button { margin-bottom:10px; }
+
+.content {
+  flex:1;
+  overflow-y:auto;
+  padding:15px;
+}
+
+.box {
+  border:1px solid #00FF41;
+  padding:12px;
+  margin-bottom:15px;
+  background:rgba(0,0,0,0.6);
+}
+</style>
+</head>
+
+<body>
+
+<!-- MATRIX BG -->
+<canvas id="matrix"></canvas>
+
+<!-- LOGIN -->
+<div id="loginBox">
+<h2>ACCESS TERMINAL</h2>
+<input id="loginUser" placeholder="Username">
+<input id="loginPass" type="password" placeholder="Password">
+<button onclick="login()">ENTER</button>
+<p id="loginError"></p>
+</div>
+
+<!-- ADMIN -->
+<div id="adminPage" class="page hidden">
+<div class="sidebar">
+<button onclick="showAdmin('create')">Create Users</button>
+<button onclick="showAdmin('broadcast')">Send Hacks/Info</button>
+<button onclick="showAdmin('manage')">Manage Users</button>
+<button onclick="clearAllMessages()">Clear ALL Messages</button>
+<button onclick="logout()">Logout</button>
+</div>
+
+<div class="content">
+<div id="create" class="box">
+<h3>Create User</h3>
+<input id="newUser" placeholder="Username">
+<input id="newPass" placeholder="Password">
+<select id="newRank">
+<option value="admin">Admin</option>
+<option value="member" selected>Member</option>
+</select>
+<button onclick="createUser()">Create</button>
+<p id="createMsg"></p>
+</div>
+
+<div id="broadcast" class="box hidden">
+<h3>Send Info/Hacks</h3>
+<select id="msgType">
+<option value="info">Info</option>
+<option value="hack">Hacks</option>
+</select>
+<textarea id="msgText" placeholder="Message"></textarea>
+<select id="msgTarget">
+<option value="all">Everyone</option>
+</select>
+<button onclick="sendMessage()">Send</button>
+<p id="sendMsg"></p>
+</div>
+
+<div id="manage" class="box hidden">
+<h3>Manage Accounts</h3>
+<select id="userList"></select>
+<button onclick="disableUser()">Disable</button>
+<button onclick="enableUser()">Enable</button>
+<button onclick="deleteUser()">Delete</button>
+<p id="manageMsg"></p>
+</div>
+</div></div>
+
+<!-- USER -->
+<div id="userPage" class="page hidden">
+<div class="sidebar">
+<button onclick="showUser('infoBox')">Info</button>
+<button onclick="showUser('hackBox')">Hacks</button>
+<button onclick="logout()">Logout</button>
+</div>
+
+<div class="content">
+<div id="infoBox" class="box">
+<h3>Information</h3><div id="infoList"></div></div>
+
+<div id="hackBox" class="box hidden">
+<h3>Cyber Hacks (Fun Tips)</h3><div id="hackList"></div></div>
+</div></div>
+
+<script>
+// DATABASE
+let users=[{username:"Admin",password:"11",rank:"admin",disabled:false}];
+let messages=[];
+let currentUser=null;
+
+// LOGIN
+function login(){
+ let u=loginUser.value,p=loginPass.value;
+ let user=users.find(x=>x.username===u&&x.password===p);
+
+ if(!user){loginError.textContent="Wrong login";return;}
+ if(user.disabled){loginError.textContent="Account disabled";return;}
+
+ currentUser=user;
+ loginBox.classList.add("hidden");
+
+ if(user.rank==="admin"){
+   adminPage.classList.remove("hidden");
+   refreshLists();
+ } else {
+   userPage.classList.remove("hidden");
+   updateMessages();
+ }
+}
+
+// LOGOUT
+function logout(){
+ adminPage.classList.add("hidden");
+ userPage.classList.add("hidden");
+ loginBox.classList.remove("hidden");
+ currentUser=null;
+}
+
+// CREATE USER
+function createUser(){
+ if(!newUser.value||!newPass.value)return;
+ users.push({username:newUser.value,password:newPass.value,rank:newRank.value,disabled:false});
+ newUser.value=""; newPass.value="";
+ refreshLists();
+ createMsg.textContent="User added!";
+}
+
+// REFRESH DROPS
+function refreshLists(){
+ msgTarget.innerHTML=`<option value="all">Everyone</option>`;
+ userList.innerHTML="";
+ users.forEach(u=>{
+   msgTarget.innerHTML+=`<option>${u.username}</option>`;
+   userList.innerHTML+=`<option>${u.username}</option>`;
+ });
+}
+
+// MESSAGES
+function sendMessage(){
+ messages.push({
+  type:msgType.value,
+  text:msgText.value,
+  target:msgTarget.value
+ });
+ msgText.value="";
+ updateMessages();
+ sendMsg.textContent="Sent!";
+}
+
+// CLEAR MESSAGES
+function clearAllMessages(){
+ messages = [];
+ updateMessages();
+ alert("All messages cleared!");
+}
+
+// MANAGE USERS
+function disableUser(){ users.find(x=>x.username===userList.value).disabled=true; manageMsg.textContent="Disabled"; }
+function enableUser(){ users.find(x=>x.username===userList.value).disabled=false; manageMsg.textContent="Enabled"; }
+function deleteUser(){ users=users.filter(x=>x.username!==userList.value); refreshLists(); manageMsg.textContent="Deleted"; }
+
+// USER VIEW UPDATES
+function updateMessages(){
+ if(!currentUser)return;
+ let info="",hack="";
+ messages.forEach(m=>{
+ if(m.target==="all"||m.target===currentUser.username){
+  if(m.type==="info") info+=`<p>> ${m.text}</p>`;
+  else hack+=`<p>[!] ${m.text}</p>`;
+ }
+ });
+ infoList.innerHTML=info;
+ hackList.innerHTML=hack;
+}
+
+// VIEW SWITCHING
+function showAdmin(id){
+ document.querySelectorAll("#adminPage .box").forEach(x=>x.classList.add("hidden"));
+ document.getElementById(id).classList.remove("hidden");
+}
+function showUser(id){
+ document.querySelectorAll("#userPage .box").forEach(x=>x.classList.add("hidden"));
+ document.getElementById(id).classList.remove("hidden");
+ updateMessages();
+}
+
+/* MATRIX BACKGROUND */
+const canvas=document.getElementById("matrix");
+const ctx=canvas.getContext("2d");
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+const characters = "アカサタナハマヤラワ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const fontSize = 16;
+const columns = canvas.width/fontSize;
+const drops = Array.from({length: columns}).map(()=>1);
+
+function drawMatrix(){
+  ctx.fillStyle="rgba(0,0,0,0.04)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="#00FF41";
+  ctx.font=fontSize+"px monospace";
+  
+  drops.forEach((y,i)=>{
+    const text = characters[Math.floor(Math.random()*characters.length)];
+    ctx.fillText(text, i*fontSize, y*fontSize);
+    drops[i] = (y*fontSize > canvas.height || Math.random() > 0.975) ? 0 : y+1;
+  });
+}
+setInterval(drawMatrix,40);
+</script>
+</body>
+</html>
+
+
+

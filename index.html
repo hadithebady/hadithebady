@@ -135,6 +135,7 @@ html,body{
   <h2 id="headline">1600+ Cheap Robux in stock</h2>
   <button onclick="openSection('shop')">Shop</button>
   <button onclick="openSection('games')">Games</button>
+  <button onclick="openTerminal()">Terminal</button> <!-- ADDED -->
 </div>
 
 <!-- SHOP -->
@@ -147,21 +148,21 @@ html,body{
   <div class="category-title">Brainrots</div>
   <div class="product-card"><h3>Los Combination</h3><p>Price: £9</p></div>
   <div class="product-card"><h3>La Grande Combination</h3><p>Price: £7</p></div>
-  <div class="product-card"><h3>Brainrots 100m–500m Available</h3><p>Price:Offer?!?</p></div>
+  <div class="product-card"><h3>Brainrots 100m–500m Available</h3><p>Price:</p></div>
 
   <div class="category-title">Fun</div>
-  <div class="product-card"><h3>Pen Watergun</h3><p>Pen that can shoot water with pressure (3 PENS) </p><p>Price: £17.99</p></div>
+  <div class="product-card"><h3>Pen Watergun</h3><p>Pen that can shoot water with pressure</p><p>Price: £3.99</p></div>
 
   <div class="category-title">Website</div>
-  <div class="product-card"><h3>Your Website</h3><p>Your own customized website</p><p>Price: £10-15</p></div>
+  <div class="product-card"><h3>Your Website</h3><p>Your own customized website</p><p>Price: £20</p></div>
 
   <div class="category-title">Roblox Game</div>
   <div class="product-card"><h3>Your Roblox Game</h3><p>Fully customized</p><p>Price: £10</p></div>
 
   <div class="category-title">Others</div>
-  <div class="product-card"><h3>99 Nights in Forest H4CKS</h3><p>Price: £2.99</p></div>
+  <div class="product-card"><h3>99 Nights in Forest</h3><p>Price: £2.99</p></div>
   <div class="product-card"><h3>Steal a Brainrot</h3><p>Sab Private Server</p><p>Price: £1.20/month</p></div>
-  <div class="product-card"><h3>Grow a Garden Pets</h3><p>Price: £2-20</p></div>
+  <div class="product-card"><h3>Grow a Garden Pets</h3><p>Price: £2</p></div>
 </div>
 
 <!-- GAMES -->
@@ -184,10 +185,7 @@ window.addEventListener("DOMContentLoaded",()=>{
   setTimeout(()=>{
     intro.style.opacity="0";
     setTimeout(()=>intro.style.display="none",1000);
-
-    // start headline AFTER intro
     setTimeout(()=>startHeadline(),1100);
-
   },3000);
 });
 
@@ -228,11 +226,8 @@ function startHeadline(){
 
     setTimeout(()=>{
       index=(index+1)%texts.length;
-
       headline.textContent=texts[index];
-
       if(index===0) countUp();
-
       headline.style.opacity="1";
     },600);
 
@@ -252,6 +247,11 @@ function openSection(section){
     sec.classList.add("active");
     if(section==='shop') animateShop();
   },400);
+}
+
+// TERMINAL OPEN =============== (NEW)
+function openTerminal(){
+  window.location.href="Terminal.html";
 }
 
 // BACK HOME
@@ -290,9 +290,5 @@ function redirectGame(game){
 </script>
 </body>
 </html>
+
 <script type="text/javascript">window.$crisp=[];window.CRISP_WEBSITE_ID="49cbe588-16a0-40ad-b50b-844419c11121";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();</script>
-
-
-
-
-
