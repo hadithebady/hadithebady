@@ -2,100 +2,70 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Cyber Control System v3</title>
+<title>Cyber Control System v4</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
 * { font-family: "Share Tech Mono", monospace; }
-
-/* MATRIX ANIMATION */
-canvas {
-  position: fixed;
-  top:0; left:0;
-  width:100vw; height:100vh;
-  z-index:-1;
-  background:black;
-}
-
-/* GENERAL */
 body {
-  margin: 0;
-  color: #00FF41;
-  overflow: hidden;
+  margin:0;
+  background:black;
+  color:#00FF41;
+  overflow:hidden;
+}
+.hidden { display:none !important; }
+canvas {
+  position:fixed;
+  top:0;left:0;
+  width:100vw;height:100vh;
+  z-index:-1;
 }
 
-.hidden { display:none !important; }
-
-/******** LOGIN *********/
+/*** LOGIN ***/
 #loginBox {
   position:fixed;
-  top:50%;left:50%;
+  top:50%; left:50%;
   transform:translate(-50%,-50%);
   border:2px solid #00FF41;
   padding:25px;
   width:300px;
-  background:rgba(0,0,0,0.85);
+  background:rgba(0,0,0,.85);
   box-shadow:0 0 15px #00FF41;
   text-align:center;
 }
-
-input, select, textarea {
-  width:100%;
-  padding:8px;
-  margin-top:6px;
-  background:black;
-  border:1px solid #00FF41;
-  color:#00FF41;
+input,select,textarea {
+  width:100%; padding:8px; margin-top:6px;
+  background:black; border:1px solid #00FF41; color:#00FF41;
 }
 button {
-  width:100%;
-  margin-top:10px;
-  padding:10px;
-  background:black;
-  border:1px solid #00FF41;
-  color:#00FF41;
+  width:100%; margin-top:10px;
+  padding:10px; background:black; border:1px solid #00FF41; color:#00FF41;
 }
-button:hover {
-  background:#00FF41;
-  color:black;
-}
+button:hover { background:#00FF41;color:black; }
 
-/******** PANELS ********/
+/*** PANELS ***/
 .page {
-  height:100vh;
-  display:flex;
-  overflow:hidden;
+  height:100vh; display:flex; overflow:hidden;
 }
-
 .sidebar {
-  width:220px;
-  background:rgba(0,0,0,0.75);
-  border-right:2px solid #00FF41;
-  padding:10px;
+  width:220px; background:rgba(0,0,0,.75);
+  border-right:2px solid #00FF41; padding:10px;
 }
 .sidebar button { margin-bottom:10px; }
-
 .content {
-  flex:1;
-  overflow-y:auto;
-  padding:15px;
+  flex:1; overflow-y:auto; padding:15px;
 }
-
 .box {
-  border:1px solid #00FF41;
-  padding:12px;
-  margin-bottom:15px;
-  background:rgba(0,0,0,0.6);
+  border:1px solid #00FF41; padding:12px;
+  margin-bottom:15px; background:rgba(0,0,0,.6);
 }
 </style>
 </head>
 
 <body>
 
-<!-- MATRIX BG -->
 <canvas id="matrix"></canvas>
 
-<!-- LOGIN -->
 <div id="loginBox">
 <h2>ACCESS TERMINAL</h2>
 <input id="loginUser" placeholder="Username">
@@ -149,6 +119,7 @@ button:hover {
 <button onclick="deleteUser()">Delete</button>
 <p id="manageMsg"></p>
 </div>
+
 </div></div>
 
 <!-- USER -->
@@ -162,35 +133,39 @@ button:hover {
 <div class="content">
 <div id="infoBox" class="box">
 <h3>Information</h3><div id="infoList"></div></div>
-
 <div id="hackBox" class="box hidden">
 <h3>Cyber Hacks (Fun Tips)</h3><div id="hackList"></div></div>
 </div></div>
 
 <script>
-// DATABASE
-let users=[{username:"Admin",password:"11",rank:"admin",disabled:false}];
-let messages=[];
-let currentUser=null;
+// LOAD from storage
+let users = JSON.parse(localStorage.getItem("users")) || [
+ {username:"Admin", password:"11", rank:"admin", disabled:false}
+];
+let messages = JSON.parse(localStorage.getItem("messages")) || [];
+
+let currentUser = null;
+
+// SAVE to storage
+function save(){
+ localStorage.setItem("users", JSON.stringify(users));
+ localStorage.setItem("messages", JSON.stringify(messages));
+}
 
 // LOGIN
 function login(){
- let u=loginUser.value,p=loginPass.value;
- let user=users.find(x=>x.username===u&&x.password===p);
+ let u = loginUser.value;
+ let p = loginPass.value;
+ let user = users.find(x=>x.username===u&&x.password===p);
 
- if(!user){loginError.textContent="Wrong login";return;}
- if(user.disabled){loginError.textContent="Account disabled";return;}
+ if(!user) return loginError.textContent="Wrong login";
+ if(user.disabled) return loginError.textContent="Disabled user";
 
  currentUser=user;
  loginBox.classList.add("hidden");
 
- if(user.rank==="admin"){
-   adminPage.classList.remove("hidden");
-   refreshLists();
- } else {
-   userPage.classList.remove("hidden");
-   updateMessages();
- }
+ if(user.rank==="admin"){ adminPage.classList.remove("hidden"); refreshLists(); }
+ else { userPage.classList.remove("hidden"); updateMessages(); }
 }
 
 // LOGOUT
@@ -205,12 +180,13 @@ function logout(){
 function createUser(){
  if(!newUser.value||!newPass.value)return;
  users.push({username:newUser.value,password:newPass.value,rank:newRank.value,disabled:false});
+ save();
  newUser.value=""; newPass.value="";
  refreshLists();
  createMsg.textContent="User added!";
 }
 
-// REFRESH DROPS
+// DROPS
 function refreshLists(){
  msgTarget.innerHTML=`<option value="all">Everyone</option>`;
  userList.innerHTML="";
@@ -220,31 +196,32 @@ function refreshLists(){
  });
 }
 
-// MESSAGES
+// SEND MESSAGE
 function sendMessage(){
+ if(!msgText.value)return;
  messages.push({
-  type:msgType.value,
-  text:msgText.value,
-  target:msgTarget.value
+  type:msgType.value, text:msgText.value, target:msgTarget.value
  });
+ save();
  msgText.value="";
  updateMessages();
  sendMsg.textContent="Sent!";
 }
 
-// CLEAR MESSAGES
+// CLEAR MSG
 function clearAllMessages(){
- messages = [];
+ messages=[];
+ save();
  updateMessages();
  alert("All messages cleared!");
 }
 
-// MANAGE USERS
-function disableUser(){ users.find(x=>x.username===userList.value).disabled=true; manageMsg.textContent="Disabled"; }
-function enableUser(){ users.find(x=>x.username===userList.value).disabled=false; manageMsg.textContent="Enabled"; }
-function deleteUser(){ users=users.filter(x=>x.username!==userList.value); refreshLists(); manageMsg.textContent="Deleted"; }
+// USER MANAGEMENT
+function disableUser(){ users.find(u=>u.username===userList.value).disabled=true; save(); manageMsg.textContent="Disabled"; }
+function enableUser(){ users.find(u=>u.username===userList.value).disabled=false; save(); manageMsg.textContent="Enabled"; }
+function deleteUser(){ users=users.filter(u=>u.username!==userList.value); save(); refreshLists(); manageMsg.textContent="Deleted"; }
 
-// USER VIEW UPDATES
+// UPDATE VIEW
 function updateMessages(){
  if(!currentUser)return;
  let info="",hack="";
@@ -258,7 +235,7 @@ function updateMessages(){
  hackList.innerHTML=hack;
 }
 
-// VIEW SWITCHING
+// SWITCH
 function showAdmin(id){
  document.querySelectorAll("#adminPage .box").forEach(x=>x.classList.add("hidden"));
  document.getElementById(id).classList.remove("hidden");
@@ -269,33 +246,33 @@ function showUser(id){
  updateMessages();
 }
 
-/* MATRIX BACKGROUND */
+/******** MATRIX BG ********/
 const canvas=document.getElementById("matrix");
 const ctx=canvas.getContext("2d");
-canvas.width=window.innerWidth;
-canvas.height=window.innerHeight;
+canvas.width=innerWidth;
+canvas.height=innerHeight;
+const chars="アカサタナハマヤラワ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const fontSize=16;
+const columns=canvas.width/fontSize;
+const drops=Array(Math.floor(columns)).fill(1);
 
-const characters = "アカサタナハマヤラワ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const fontSize = 16;
-const columns = canvas.width/fontSize;
-const drops = Array.from({length: columns}).map(()=>1);
-
-function drawMatrix(){
-  ctx.fillStyle="rgba(0,0,0,0.04)";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle="#00FF41";
-  ctx.font=fontSize+"px monospace";
-  
-  drops.forEach((y,i)=>{
-    const text = characters[Math.floor(Math.random()*characters.length)];
-    ctx.fillText(text, i*fontSize, y*fontSize);
-    drops[i] = (y*fontSize > canvas.height || Math.random() > 0.975) ? 0 : y+1;
-  });
+function draw(){
+ ctx.fillStyle="rgba(0,0,0,0.04)";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.fillStyle="#00FF41";
+ ctx.font=fontSize+"px monospace";
+ drops.forEach((y,i)=>{
+   const text=chars[Math.floor(Math.random()*chars.length)];
+   ctx.fillText(text,i*fontSize,y*fontSize);
+   drops[i]=(y*fontSize>canvas.height||Math.random()>0.975)?0:y+1;
+ });
 }
-setInterval(drawMatrix,40);
+setInterval(draw,40);
 </script>
 </body>
 </html>
+
+
 
 
 
