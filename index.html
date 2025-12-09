@@ -195,397 +195,327 @@ html,body{
          style="background:#1a1a1a; padding:25px; border-radius:12px; border-left:4px solid #00ffff;
          max-height:60vh; overflow-y:auto; overflow-x:hidden;">
       <p style="color:#ccc;"># ================================================================
-# PART 1 — IMPORTS, DATABASE, GLOBALS
+# PART A — IMPORTS, GLOBALS, SIMPLE STORAGE (FIXED)
 # ================================================================
- 
-import os
-import sqlite3
-import threading
-import time
+
 import socket
+import pickle
 import tkinter as tk
-from tkinter import messagebox, filedialog
-import webbrowser
-import requests
+from tkinter import filedialog, messagebox
+import os
 from PIL import Image, ImageTk
-from flask import Flask, request, jsonify, send_from_directory
-from flask_socketio import SocketIO, emit
-from werkzeug.utils import secure_filename
-from socketio import Client as SocketIOClient
- 
-# -----------------------------
-# GLOBAL UI COLORS
-# -----------------------------
+
+# ----------------------------
+# Basic UI colors
+# ----------------------------
 BG = "#111111"
-BTN = "#222222"
-BTN_HOVER = "#2b4cff"
 TXT = "white"
- 
-CURRENT_USER = None
- 
-# -----------------------------
-# DATABASE INIT
-# -----------------------------
-DB = sqlite3.connect("m3n_data.db", check_same_thread=False)
-cur = DB.cursor()
- 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS users(
-    username TEXT PRIMARY KEY,
-    password TEXT,
-    pfp TEXT
-)
-""")
- 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS chat(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    message TEXT,
-    timestamp TEXT
-)
-""")
- 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS feed(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    filename TEXT,
-    uploader TEXT
-)
-""")
- 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS likes(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    media_id INTEGER,
-    username TEXT
-)
-""")
- 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS comments(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    media_id INTEGER,
-    username TEXT,
-    text TEXT
-)
-""")
- 
-DB.commit()
- 
+BTN = "#222222"
+BTN_HOVER = "#4444aa"
+
+# ----------------------------
+# In-memory chat history
+# ----------------------------
+chat_history = []
+
+# ----------------------------
+# Data folders
+# ----------------------------
 os.makedirs("feed", exist_ok=True)
 os.makedirs("pfp", exist_ok=True)
- 
- 
-# -----------------------------
-# Button creator
-# -----------------------------
-def make_button(parent, text, cmd, w=22):
-    btn = tk.Button(
-        parent,
-        text=text,
-        width=w,
-        height=2,
-        bg=BTN,
-        fg=TXT,
-        font=("Segoe UI", 12),
-        command=cmd,
-        activebackground=BTN_HOVER,
-        activeforeground="white"
-    )
- 
-    def hover_in(e): btn.config(bg=BTN_HOVER)
-    def hover_out(e): btn.config(bg=BTN)
- 
-    btn.bind("<Enter>", hover_in)
-    btn.bind("<Leave>", hover_out)
-    btn.pack(pady=6)
-    return btn
+
+# ----------------------------
+# USER DATABASE FIX (IMPORTANT)
+# ----------------------------
+USER_DB_FILE = "users.pkl"
+
+# Try loading saved users
+try:
+    with open(USER_DB_FILE, "rb") as f:
+        user_db = pickle.load(f)
+
+        # If corrupted, replace
+        if not isinstance(user_db, dict):
+            user_db = {}
+except:
+    user_db = {}  # Start fresh if file missing or unreadable
+
+def save_users():
+    with open(USER_DB_FILE, "wb") as f:
+        pickle.dump(user_db, f)
+
+
+# ----------------------------
+# Networking (LAN)
+# ----------------------------
+PORT = 5050
+
+def get_local_ip():
+    """Returns LAN WiFi IP."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    except:
+        ip = "127.0.0.1"
+    finally:
+        s.close()
+    return ip
+
+LOCAL_IP = get_local_ip()
+
+IS_SERVER = False
+server_socket = None
+client_socket = None
+clients = []  # connected clients (server only)
+
 # ================================================================
-# PART 2 — FLASK FEED SERVER + SOCKET.IO REAL-TIME CHAT
+# PART B — NON-BLOCKING LAN SERVER (NO THREADS)
 # ================================================================
- 
-flask_app = Flask(__name__)
-flask_app.config['SECRET_KEY'] = "m3n_secret"
-socketio = SocketIO(flask_app, cors_allowed_origins="*")
- 
-UPLOAD_FOLDER = "feed"
-flask_app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
- 
- 
+
+def start_server():
+    """Start server if no one else is using the port."""
+    global server_socket, IS_SERVER
+
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setblocking(False)
+
+    try:
+        server_socket.bind((LOCAL_IP, PORT))
+        server_socket.listen(5)
+        IS_SERVER = True
+        print(f"[SERVER] Running at {LOCAL_IP}:{PORT}")
+    except:
+        print("[SERVER] Another device is already the server.")
+        server_socket = None
+        IS_SERVER = False
+
+
+def server_check_messages(root):
+    """Accept clients + receive messages using non-blocking mode."""
+    global clients, chat_history
+
+    if IS_SERVER:
+        # --------------------------
+        # Accept new clients
+        # --------------------------
+        try:
+            conn, addr = server_socket.accept()
+            conn.setblocking(False)
+            clients.append(conn)
+            print("[SERVER] Client joined:", addr)
+        except BlockingIOError:
+            pass
+
+        # --------------------------
+        # Receive messages
+        # --------------------------
+        dead = []
+        for conn in clients:
+            try:
+                data = conn.recv(4096)
+                if data:
+                    msg = pickle.loads(data)
+                    chat_history.append(msg)
+                    update_chat_windows(msg)
+
+                    # broadcast to all clients
+                    for c in clients:
+                        if c != conn:
+                            try:
+                                c.sendall(pickle.dumps(msg))
+                            except:
+                                dead.append(c)
+            except BlockingIOError:
+                pass
+            except:
+                dead.append(conn)
+
+        # Remove dead sockets
+        for c in dead:
+            if c in clients:
+                clients.remove(c)
+
+    # schedule again
+    root.after(100, lambda: server_check_messages(root))
 # ================================================================
-# REAL-TIME CHAT (SOCKET.IO)
+# PART C — NON-BLOCKING LAN CLIENT
 # ================================================================
-@socketio.on("send_message")
-def handle_send_message(data):
-    username = data.get("username", "Unknown")
-    text = data.get("text", "")
- 
-    if not text.strip():
+
+def connect_to_server():
+    """Try connecting to server (another device)."""
+    global client_socket, IS_SERVER
+
+    if IS_SERVER:
+        print("[CLIENT] This device IS the server.")
         return
- 
-    # Save to DB
-    cur.execute(
-        "INSERT INTO chat(username, message, timestamp) VALUES(?,?,datetime('now'))",
-        (username, text)
-    )
-    DB.commit()
- 
-    # Broadcast
-    emit("new_message", {"username": username, "text": text}, broadcast=True)
- 
- 
-# Chat history endpoint (for Tkinter chat window)
-@flask_app.route("/chat_history")
-def chat_history():
-    cur.execute("SELECT username, message FROM chat ORDER BY id ASC")
-    rows = cur.fetchall()
-    return jsonify(rows)
- 
- 
+
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.setblocking(False)
+
+    try:
+        client_socket.connect((LOCAL_IP, PORT))
+    except BlockingIOError:
+        pass
+    except:
+        print("[CLIENT] No server found.")
+        client_socket = None
+        return
+
+    print("[CLIENT] Connected to server!")
+
+
+def client_check_messages(root):
+    """Receive server messages without blocking."""
+    global client_socket, chat_history
+
+    if client_socket is not None:
+        try:
+            data = client_socket.recv(4096)
+            if data:
+                msg = pickle.loads(data)
+                chat_history.append(msg)
+                update_chat_windows(msg)
+        except BlockingIOError:
+            pass
+        except:
+            client_socket = None
+
+    root.after(100, lambda: client_check_messages(root))
 # ================================================================
-# FEED HTML PAGE
+# PART D — LOGIN + REGISTER (NO SEPARATE REGISTER WINDOW)
 # ================================================================
-@flask_app.route("/feed")
-def feed_page():
-    html = """
-    <html>
-    <head>
-        <title>M3N Feed</title>
-        <style>
-            body { background:#111; color:white; font-family:Segoe UI; }
-            h1 { text-align:center; margin-top:30px; }
-            .item {
-                background:#222;
-                padding:15px;
-                margin:20px auto;
-                width:80%;
-                border-radius:10px;
-            }
-            img, video { max-width:100%; border-radius:8px; }
-            .meta { margin-top:10px; font-size:14px; }
-        </style>
-    </head>
-    <body>
-        <h1>M3N Feed — Made by Hadi ❤️</h1>
-    """
- 
-    cur.execute("SELECT id, filename, uploader FROM feed ORDER BY id DESC")
-    files = cur.fetchall()
- 
-    for media_id, filename, uploader in files:
-        html += "<div class='item'>"
-        html += f"<h3>{filename} — by {uploader}</h3>"
- 
-        ext = filename.lower().split(".")[-1]
-        url = "/media/" + filename
- 
-        if ext in ("png", "jpg", "jpeg"):
-            html += f"<img src='{url}' />"
-        else:
-            html += f"<video controls src='{url}'></video>"
- 
-        # Likes
-        cur.execute("SELECT COUNT(*) FROM likes WHERE media_id=?", (media_id,))
-        likes = cur.fetchone()[0]
- 
-        # Comments count
-        cur.execute("SELECT COUNT(*) FROM comments WHERE media_id=?", (media_id,))
-        cc = cur.fetchone()[0]
- 
-        html += f"<div class='meta'>❤️ Likes: {likes} — 💬 Comments: {cc}</div>"
-        html += "</div>"
- 
-    html += "</body></html>"
-    return html
- 
- 
-# ================================================================
-# SERVE MEDIA FILES
-# ================================================================
-@flask_app.route("/media/<path:filename>")
-def serve_media(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
- 
- 
-# ================================================================
-# UPLOAD MEDIA
-# ================================================================
-@flask_app.route("/upload_media", methods=["POST"])
-def upload_media():
-    file = request.files.get("file")
-    username = request.form.get("username")
- 
-    if not file:
-        return "No file uploaded.", 400
- 
-    fname = secure_filename(file.filename)
-    save_path = os.path.join(UPLOAD_FOLDER, fname)
-    file.save(save_path)
- 
-    cur.execute("INSERT INTO feed(filename, uploader) VALUES(?,?)", (fname, username))
-    DB.commit()
- 
-    return "OK"
- 
- 
-# ================================================================
-# LIKE MEDIA
-# ================================================================
-@flask_app.route("/like", methods=["POST"])
-def like_media():
-    mid = request.form.get("media_id")
-    username = request.form.get("username")
- 
-    if mid and username:
-        cur.execute("INSERT INTO likes(media_id, username) VALUES(?,?)", (mid, username))
-        DB.commit()
- 
-    return "OK"
- 
- 
-# ================================================================
-# COMMENT MEDIA
-# ================================================================
-@flask_app.route("/comment", methods=["POST"])
-def comment_media():
-    mid = request.form.get("media_id")
-    username = request.form.get("username")
-    text = request.form.get("text")
- 
-    if mid and username and text:
-        cur.execute(
-            "INSERT INTO comments(media_id, username, text) VALUES(?,?,?)",
-            (mid, username, text)
-        )
-        DB.commit()
- 
-    return "OK"
- 
- 
-# ================================================================
-# START SERVER THREAD
-# ================================================================
-def start_flask_server():
-    socketio.run(flask_app, host="0.0.0.0", port=5000, debug=False)
-# ================================================================
-# PART 3 — SIMPLE LOGIN + REGISTER (ONE WINDOW)
-# ================================================================
- 
-def open_login():
-    global CURRENT_USER
- 
-    root = tk.Tk()
-    root.title("M3N Login")
-    root.geometry("480x380")
-    root.configure(bg=BG)
- 
+
+CURRENT_USER = None
+USER_DB_FILE = "users.pkl"
+
+# Load or create user database
+try:
+    with open(USER_DB_FILE, "rb") as f:
+        user_db = pickle.load(f)
+except:
+    user_db = {}  # empty database
+
+
+def save_users():
+    with open(USER_DB_FILE, "wb") as f:
+        pickle.dump(user_db, f)
+
+
+def open_login_window(root):
+    login = tk.Toplevel(root)
+    login.title("Login / Register")
+    login.geometry("420x330")
+    login.configure(bg=BG)
+    login.resizable(False, False)
+
     tk.Label(
-        root,
-        text="M3N Login",
+        login,
+        text="Login / Register",
         fg="white",
         bg=BG,
-        font=("Segoe UI", 28, "bold")
-    ).pack(pady=25)
- 
-    frame = tk.Frame(root, bg=BG)
-    frame.pack()
- 
-    # -------------------------------
-    # Username Entry
-    # -------------------------------
-    tk.Label(frame, text="Username:", fg="white", bg=BG,
-             font=("Segoe UI", 14)).pack(pady=5)
-    username_entry = tk.Entry(frame, font=("Segoe UI", 14))
-    username_entry.pack()
- 
-    # -------------------------------
-    # Password Entry
-    # -------------------------------
-    tk.Label(frame, text="Password:", fg="white", bg=BG,
-             font=("Segoe UI", 14)).pack(pady=5)
-    password_entry = tk.Entry(frame, font=("Segoe UI", 14), show="*")
-    password_entry.pack()
- 
-    # ============================================================
+        font=("Segoe UI", 26, "bold")
+    ).pack(pady=15)
+
+    # Username
+    tk.Label(
+        login,
+        text="Username:",
+        fg="white",
+        bg=BG,
+        font=("Segoe UI", 14)
+    ).pack()
+    user_entry = tk.Entry(login, font=("Segoe UI", 14))
+    user_entry.pack(pady=5)
+
+    # Password
+    tk.Label(
+        login,
+        text="Password:",
+        fg="white",
+        bg=BG,
+        font=("Segoe UI", 14)
+    ).pack()
+    pass_entry = tk.Entry(login, font=("Segoe UI", 14), show="*")
+    pass_entry.pack(pady=5)
+
+    # ----------------------------
     # LOGIN FUNCTION
-    # ============================================================
+    # ----------------------------
     def do_login():
         global CURRENT_USER
- 
-        u = username_entry.get().strip()
-        p = password_entry.get().strip()
- 
-        if not u or not p:
-            messagebox.showerror("Error", "Please fill all fields.")
+
+        username = user_entry.get().strip()
+        password = pass_entry.get().strip()
+
+        if username not in user_db:
+            messagebox.showerror("Login Failed", "Account does not exist!")
             return
- 
-        cur.execute("SELECT password FROM users WHERE username=?", (u,))
-        row = cur.fetchone()
- 
-        if not row:
-            messagebox.showerror("Error", "User does not exist.")
+
+        if user_db[username] != password:
+            messagebox.showerror("Login Failed", "Incorrect password.")
             return
- 
-        if row[0] != p:
-            messagebox.showerror("Error", "Incorrect password.")
-            return
- 
-        CURRENT_USER = u
-        root.destroy()
-        open_dashboard()
- 
-    # ============================================================
+
+        CURRENT_USER = username
+        login.destroy()
+        open_dashboard(root)
+
+    # ----------------------------
     # REGISTER FUNCTION
-    # ============================================================
+    # ----------------------------
     def do_register():
-        u = username_entry.get().strip()
-        p = password_entry.get().strip()
- 
-        if not u or not p:
-            messagebox.showerror("Error", "Enter username + password first.")
+        username = user_entry.get().strip()
+        password = pass_entry.get().strip()
+
+        if not username or not password:
+            messagebox.showerror("Error", "Enter username and password.")
             return
- 
-        cur.execute("SELECT username FROM users WHERE username=?", (u,))
-        if cur.fetchone():
-            messagebox.showerror("Error", "Username already taken.")
+
+        if username in user_db:
+            messagebox.showerror("Register Failed", "Username already exists!")
             return
- 
-        cur.execute(
-            "INSERT INTO users(username, password, pfp) VALUES(?,?,?)",
-            (u, p, "")
-        )
-        DB.commit()
- 
-        messagebox.showinfo("Success", "Account created! You may login now.")
- 
-    # -------------------------------
+
+        # Create new account
+        user_db[username] = password
+        save_users()
+
+        messagebox.showinfo("Success", "Account created! Now login.")
+
+    # ----------------------------
     # Buttons
-    # -------------------------------
-    make_button(frame, "Login", do_login)
-    make_button(frame, "Register", do_register)
- 
-    tk.Label(
-        root,
-        text="Made by Hadi ❤️",
-        fg="#4da6ff",
-        bg=BG,
-        font=("Segoe UI", 12)
-    ).pack(pady=20)
- 
-    root.mainloop()
+    # ----------------------------
+    tk.Button(
+        login,
+        text="Login",
+        bg=BTN,
+        fg="white",
+        activebackground=BTN_HOVER,
+        width=14,
+        height=2,
+        command=do_login
+    ).pack(pady=10)
+
+    tk.Button(
+        login,
+        text="Register",
+        bg=BTN,
+        fg="white",
+        activebackground=BTN_HOVER,
+        width=14,
+        height=2,
+        command=do_register
+    ).pack()
 # ================================================================
-# PART 4 — DASHBOARD (ALL BUTTONS, 2-COLUMN LAYOUT)
+# PART E — DASHBOARD (ALL BUTTONS RESTORED)
 # ================================================================
- 
-def open_dashboard():
-    dash = tk.Tk()
-    dash.title("M3N Dashboard")
+
+def open_dashboard(root):
+    dash = tk.Toplevel(root)
+    dash.title("Dashboard")
     dash.geometry("950x550")
     dash.configure(bg=BG)
     dash.resizable(True, True)
- 
-    # Title
+
     tk.Label(
         dash,
         text=f"Welcome, {CURRENT_USER}",
@@ -593,528 +523,386 @@ def open_dashboard():
         bg=BG,
         font=("Segoe UI", 28, "bold")
     ).pack(pady=25)
- 
-    # Container for columns
+
     container = tk.Frame(dash, bg=BG)
     container.pack()
- 
+
     left = tk.Frame(container, bg=BG)
     right = tk.Frame(container, bg=BG)
-    left.grid(row=0, column=0, padx=80)
-    right.grid(row=0, column=1, padx=80)
- 
-    # -----------------------------------------------------------
-    # FEED OPENER (FORCE MICROSOFT EDGE)
-    # -----------------------------------------------------------
-    def open_feed_edge():
-        try:
-            webbrowser.get("windows-edge").open_new("http://127.0.0.1:5000/feed")
-        except:
-            paths = [
-                r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-                r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-            ]
-            for p in paths:
-                if os.path.exists(p):
-                    os.system(f'"{p}" http://127.0.0.1:5000/feed')
-                    return
-            webbrowser.open("http://127.0.0.1:5000/feed")
- 
-    # -----------------------------------------------------------
-    # LEFT COLUMN BUTTONS
-    # -----------------------------------------------------------
-    make_button(left, "Global Chat", open_chat_window)
-    make_button(left, "Open Feed (Edge)", open_feed_edge)
-    make_button(left, "Upload Media", open_upload_window)
-    make_button(left, "Snake Game", open_snake_game)
- 
-    # -----------------------------------------------------------
-    # RIGHT COLUMN BUTTONS
-    # -----------------------------------------------------------
- 
-    make_button(right, "Change Profile Picture", open_pfp_window)
- 
-    make_button(right, "Minecraft Website",
-                lambda: webbrowser.open("https://example.com"))
- 
-    make_button(right, "Credits (Made by Hadi)",
-                lambda: messagebox.showinfo("Credits", "Made by Hadi ❤️"))
- 
-    def logout():
-        dash.destroy()
-        open_login()
- 
-    make_button(right, "Logout", logout)
-    make_button(right, "Exit Application", dash.destroy)
+    left.grid(row=0, column=0, padx=60)
+    right.grid(row=0, column=1, padx=60)
+
+    # LEFT BUTTONS
+    tk.Button(left, text="Global Chat", width=22, height=2,
+              bg=BTN, fg="white", activebackground=BTN_HOVER,
+              command=lambda: open_chat_window(dash)).pack(pady=6)
+
+    tk.Button(left, text="Open Feed", width=22, height=2,
+              bg=BTN, fg="white", activebackground=BTN_HOVER,
+              command=open_feed_window).pack(pady=6)
+
+    tk.Button(left, text="Upload Media", width=22, height=2,
+              bg=BTN, fg="white", activebackground=BTN_HOVER,
+              command=open_upload_window).pack(pady=6)
+
+    tk.Button(left, text="Snake Game", width=22, height=2,
+              bg=BTN, fg="white", activebackground=BTN_HOVER,
+              command=open_snake_game).pack(pady=6)
+
+    # RIGHT BUTTONS
+    tk.Button(right, text="Change Profile Picture", width=22, height=2,
+              bg=BTN, fg="white", activebackground=BTN_HOVER,
+              command=open_pfp_window).pack(pady=6)
+
+    tk.Button(right, text="Minecraft Website", width=22, height=2,
+              bg=BTN, fg="white", activebackground=BTN_HOVER,
+              command=lambda: os.system("start https://example.com")).pack(pady=6)
+
+    tk.Button(right, text="Credits (Made by Hadi)", width=22, height=2,
+              bg=BTN, fg="white", activebackground=BTN_HOVER,
+              command=lambda: messagebox.showinfo("Credits", "Made by Hadi ❤️")).pack(pady=6)
+
+    tk.Button(right, text="Logout", width=22, height=2,
+              bg=BTN, fg="white", activebackground=BTN_HOVER,
+              command=lambda: (dash.destroy(), open_login_window(root))).pack(pady=6)
+
+    tk.Button(right, text="Exit Program", width=22, height=2,
+              bg=BTN, fg="white", activebackground=BTN_HOVER,
+              command=root.destroy).pack(pady=6)
 # ================================================================
-# PART 5 — REAL-TIME TKINTER CHAT WITH SCROLLBAR (CLASSIC FORMAT)
+# PART F — CHAT WINDOW (REAL-TIME, NO THREADS)
 # ================================================================
- 
-sio = SocketIOClient()
- 
-# ------------------------------------------------------------
-# Connect client to Socket.IO server
-# ------------------------------------------------------------
-def start_socket_client():
-    try:
-        sio.connect("http://127.0.0.1:5000")
-        print("[CHAT] Connected to server")
-    except Exception as e:
-        print("[CHAT ERROR]", e)
- 
-threading.Thread(target=start_socket_client, daemon=True).start()
- 
- 
-# ============================================================
-# OPEN CHAT WINDOW
-# ============================================================
-def open_chat_window():
-    chat = tk.Toplevel()
-    chat.title("Global Chat")
-    chat.geometry("700x600")
-    chat.configure(bg=BG)
-    chat.resizable(True, True)
- 
+
+open_chat_windows = []  # stores all open text widgets
+
+
+def update_chat_windows(msg):
+    """Update EVERY chat window instantly when new message arrives."""
+    for log in open_chat_windows:
+        log.config(state="normal")
+        log.insert("end", f"{msg['user']}: {msg['text']}\n")
+        log.config(state="disabled")
+        log.see("end")
+
+
+def open_chat_window(root):
+    chat_win = tk.Toplevel(root)
+    chat_win.title("Global Chat")
+    chat_win.geometry("650x550")
+    chat_win.configure(bg=BG)
+    chat_win.resizable(True, True)
+
     tk.Label(
-        chat,
+        chat_win,
         text="Global Chat",
         fg="white",
         bg=BG,
         font=("Segoe UI", 22, "bold")
     ).pack(pady=10)
- 
-    # --------------------------------------------------------
+
     # SCROLLABLE CHAT LOG
-    # --------------------------------------------------------
-    log_frame = tk.Frame(chat, bg=BG)
-    log_frame.pack(fill="both", expand=True, padx=10, pady=10)
- 
-    scrollbar = tk.Scrollbar(log_frame)
+    frame = tk.Frame(chat_win, bg=BG)
+    frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+    scrollbar = tk.Scrollbar(frame)
     scrollbar.pack(side="right", fill="y")
- 
+
     log = tk.Text(
-        log_frame,
+        frame,
         bg="#000000",
         fg="white",
         font=("Segoe UI", 12),
-        state="disabled",
         wrap="word",
+        state="disabled",
         yscrollcommand=scrollbar.set
     )
     log.pack(side="left", fill="both", expand=True)
     scrollbar.config(command=log.yview)
- 
-    # --------------------------------------------------------
-    # MESSAGE ENTRY
-    # --------------------------------------------------------
-    bottom = tk.Frame(chat, bg=BG)
-    bottom.pack(fill="x")
- 
+
+    open_chat_windows.append(log)
+
+    # LOAD HISTORY
+    log.config(state="normal")
+    for msg in chat_history:
+        log.insert("end", f"{msg['user']}: {msg['text']}\n")
+    log.config(state="disabled")
+    log.see("end")
+
     entry = tk.Entry(
-        bottom,
-        bg="#222222",
-        fg="white",
+        chat_win,
         font=("Segoe UI", 14),
-        insertbackground="white",
-        relief="flat"
+        bg="#222",
+        fg="white",
+        relief="flat",
+        insertbackground="white"
     )
-    entry.pack(side="left", fill="x", expand=True, padx=10, pady=10)
- 
-    # --------------------------------------------------------
-    # SEND MESSAGE
-    # --------------------------------------------------------
-    def send_message(event=None):
-        text = entry.get().rstrip()
+    entry.pack(fill="x", padx=10, pady=10)
+
+    def send_msg(event=None):
+        text = entry.get().strip()
         if not text:
             return
- 
-        sio.emit("send_message", {
-            "username": CURRENT_USER,
-            "text": text
-        })
- 
+
+        msg = {"user": CURRENT_USER, "text": text}
+        chat_history.append(msg)
+        update_chat_windows(msg)
+
+        # Client → send to server
+        if client_socket:
+            try: client_socket.sendall(pickle.dumps(msg))
+            except: pass
+
+        # Server → broadcast
+        if IS_SERVER:
+            for c in clients:
+                try: c.sendall(pickle.dumps(msg))
+                except: pass
+
         entry.delete(0, tk.END)
- 
-    entry.bind("<Return>", send_message)
- 
+
+    entry.bind("<Return>", send_msg)
+
     tk.Button(
-        bottom,
+        chat_win,
         text="Send",
         bg=BTN,
         fg="white",
-        activebackground=BTN_HOVER,
-        activeforeground="white",
         width=12,
-        command=send_message
-    ).pack(side="left", padx=10)
- 
-    # --------------------------------------------------------
-    # LOAD CHAT HISTORY
-    # --------------------------------------------------------
-    try:
-        history = requests.get("http://127.0.0.1:5000/chat_history").json()
- 
-        log.config(state="normal")
-        for username, msg in history:
-            log.insert(tk.END, f"{username}: {msg}\n")
-        log.config(state="disabled")
-        log.see(tk.END)
-    except:
-        print("[CHAT] Could not load chat history")
- 
-    # --------------------------------------------------------
-    # RECEIVE REAL-TIME MESSAGES
-    # --------------------------------------------------------
-    @sio.on("new_message")
-    def receive_message(data):
-        log.config(state="normal")
-        # CLASSIC FORMAT → single line
-        log.insert(tk.END, f"{data['username']}: {data['text']}\n")
-        log.config(state="disabled")
-        log.see(tk.END)
- 
-    chat.mainloop()
- 
- 
+        activebackground=BTN_HOVER,
+        command=send_msg
+    ).pack(pady=5)
 # ================================================================
-# PART 6 — UPLOAD MEDIA WINDOW
+# PART G — FEED VIEWER
 # ================================================================
- 
+
+def open_feed_window():
+    win = tk.Toplevel()
+    win.title("Image / Video Feed")
+    win.geometry("650x600")
+    win.configure(bg=BG)
+    win.resizable(True, True)
+
+    tk.Label(
+        win,
+        text="Feed",
+        fg="white",
+        bg=BG,
+        font=("Segoe UI", 22, "bold")
+    ).pack(pady=10)
+
+    frame = tk.Frame(win, bg=BG)
+    frame.pack(fill="both", expand=True)
+
+    canvas = tk.Canvas(frame, bg=BG, highlightthickness=0)
+    canvas.pack(side="left", fill="both", expand=True)
+
+    scrollbar = tk.Scrollbar(frame, command=canvas.yview)
+    scrollbar.pack(side="right", fill="y")
+
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    inner = tk.Frame(canvas, bg=BG)
+    canvas.create_window((0, 0), window=inner, anchor="nw")
+
+    # LOAD FEED FILES
+    for file in os.listdir("feed"):
+        path = os.path.join("feed", file)
+
+        tk.Label(inner, text=file, fg="white", bg=BG,
+                 font=("Segoe UI", 12, "bold")).pack(pady=5)
+
+        if file.lower().endswith((".png", ".jpg", ".jpeg", ".gif")):
+            img = Image.open(path)
+            img.thumbnail((400, 400))
+            photo = ImageTk.PhotoImage(img)
+
+            lbl = tk.Label(inner, image=photo, bg=BG)
+            lbl.image = photo
+            lbl.pack(pady=10)
+
+        elif file.lower().endswith((".mp4", ".mov", ".avi")):
+            tk.Label(inner, text="[Video File]", fg="cyan", bg=BG).pack(pady=10)
+
+    inner.update_idletasks()
+    canvas.configure(scrollregion=canvas.bbox("all"))
+# ================================================================
+# PART H — UPLOAD MEDIA (Feed Upload)
+# ================================================================
+
 def open_upload_window():
     win = tk.Toplevel()
     win.title("Upload Media")
-    win.geometry("450x280")
+    win.geometry("400x250")
     win.configure(bg=BG)
     win.resizable(False, False)
- 
+
     tk.Label(
         win,
         text="Upload Image / Video",
         fg="white",
         bg=BG,
-        font=("Segoe UI", 22, "bold")
-    ).pack(pady=15)
- 
-    # Selected file path
-    selected_path = tk.StringVar(value="No file selected")
- 
-    tk.Label(
-        win,
-        textvariable=selected_path,
-        fg="#bbbbbb",
-        bg=BG,
-        font=("Segoe UI", 10)
-    ).pack(pady=4)
- 
-    # -------------------------------
-    # FILE PICKER
-    # -------------------------------
-    def choose_file():
-        fp = filedialog.askopenfilename(
-            title="Select media",
+        font=("Segoe UI", 20, "bold")
+    ).pack(pady=20)
+
+    def do_upload():
+        file = filedialog.askopenfilename(
             filetypes=[
-                ("Media Files", "*.png *.jpg *.jpeg *.mp4 *.mov *.webm"),
+                ("Media Files", "*.jpg;*.png;*.jpeg;*.gif;*.mp4;*.mov;*.avi"),
                 ("All Files", "*.*")
             ]
         )
-        if fp:
-            selected_path.set(fp)
- 
-    make_button(win, "Choose File", choose_file, w=18)
- 
-    # -------------------------------
-    # UPLOAD FUNCTION
-    # -------------------------------
-    def upload_now():
-        fp = selected_path.get()
-        if fp == "No file selected":
-            messagebox.showerror("Error", "Choose a media file first.")
+        if not file:
             return
- 
-        try:
-            files = {"file": open(fp, "rb")}
-            data = {"username": CURRENT_USER}
- 
-            r = requests.post("http://127.0.0.1:5000/upload_media", files=files, data=data)
- 
-            if r.status_code == 200:
-                messagebox.showinfo("Success", "Upload complete! Check the Feed.")
-            else:
-                messagebox.showerror("Error", f"Upload failed: {r.text}")
- 
-        except Exception as e:
-            messagebox.showerror("Error", f"Upload error:\n{e}")
- 
-    make_button(win, "Upload", upload_now, w=18)
-# ================================================================
-# PART 7 — SETTINGS WINDOW + PROFILE PICTURE WINDOW
-# ================================================================
- 
-# -----------------------------
-# SETTINGS WINDOW
-# -----------------------------
-def open_settings_window():
-    win = tk.Toplevel()
-    win.title("Settings")
-    win.geometry("450x420")
-    win.configure(bg=BG)
-    win.resizable(False, False)
- 
-    tk.Label(
+
+        # copy file into "feed/" folder
+        filename = os.path.basename(file)
+        dest = os.path.join("feed", filename)
+
+        with open(file, "rb") as src:
+            with open(dest, "wb") as dst:
+                dst.write(src.read())
+
+        messagebox.showinfo("Success", "Media uploaded!")
+        win.destroy()
+
+    tk.Button(
         win,
-        text="Settings",
+        text="Select File",
+        bg=BTN,
         fg="white",
-        bg=BG,
-        font=("Segoe UI", 22, "bold")
-    ).pack(pady=15)
- 
-    # -------------------------
-    # CLEAR CHAT HISTORY
-    # -------------------------
-    def clear_chat():
-        if messagebox.askyesno("Confirm", "Delete ALL chat messages?"):
-            cur.execute("DELETE FROM chat")
-            DB.commit()
-            messagebox.showinfo("Done", "Chat history cleared.")
- 
-    make_button(win, "Clear Chat History", clear_chat, w=25)
- 
-    # -------------------------
-    # CLEAR FEED
-    # -------------------------
-    def clear_feed():
-        if messagebox.askyesno("Confirm", "Delete ALL media in Feed?"):
-            cur.execute("DELETE FROM feed")
-            cur.execute("DELETE FROM likes")
-            cur.execute("DELETE FROM comments")
-            DB.commit()
- 
-            # Remove files
-            for f in os.listdir("feed"):
-                fp = os.path.join("feed", f)
-                try:
-                    os.remove(fp)
-                except:
-                    pass
- 
-            messagebox.showinfo("Done", "Feed cleared.")
- 
-    make_button(win, "Clear Image/Video Feed", clear_feed, w=25)
- 
-    # -------------------------
-    # CLEAR ALL LIKES & COMMENTS
-    # -------------------------
-    def clear_reactions():
-        cur.execute("DELETE FROM likes")
-        cur.execute("DELETE FROM comments")
-        DB.commit()
-        messagebox.showinfo("Done", "All likes and comments removed.")
- 
-    make_button(win, "Clear Likes + Comments", clear_reactions, w=25)
- 
-    # -------------------------
-    # RESET EVERYTHING
-    # -------------------------
-    def full_reset():
-        if not messagebox.askyesno("Confirm", "Delete ALL DATA (users, chat, feed)?"):
-            return
- 
-        cur.execute("DELETE FROM users")
-        cur.execute("DELETE FROM chat")
-        cur.execute("DELETE FROM feed")
-        cur.execute("DELETE FROM likes")
-        cur.execute("DELETE FROM comments")
-        DB.commit()
- 
-        for folder in ["feed", "pfp"]:
-            for f in os.listdir(folder):
-                try:
-                    os.remove(os.path.join(folder, f))
-                except:
-                    pass
- 
-        messagebox.showinfo("Done", "All data reset. Restart app.")
- 
-    make_button(win, "FULL RESET (All Data)", full_reset, w=25)
- 
- 
-# -----------------------------
-# PROFILE PICTURE WINDOW
-# -----------------------------
+        width=18,
+        height=2,
+        activebackground=BTN_HOVER,
+        command=do_upload
+    ).pack(pady=30)
+# ================================================================
+# PART I — CHANGE PROFILE PICTURE
+# ================================================================
+
 def open_pfp_window():
     win = tk.Toplevel()
     win.title("Change Profile Picture")
-    win.geometry("420x300")
+    win.geometry("400x260")
     win.configure(bg=BG)
     win.resizable(False, False)
- 
+
     tk.Label(
         win,
         text="Change Profile Picture",
         fg="white",
         bg=BG,
         font=("Segoe UI", 20, "bold")
-    ).pack(pady=15)
- 
-    selected_path = tk.StringVar(value="No file selected")
- 
-    tk.Label(
-        win,
-        textvariable=selected_path,
-        fg="#bbbbbb",
-        bg=BG,
-        font=("Segoe UI", 10)
-    ).pack(pady=5)
- 
- 
-    # -------------------------
-    # PICK FILE
-    # -------------------------
-    def pick_image():
-        fp = filedialog.askopenfilename(
-            title="Choose Profile Picture",
+    ).pack(pady=20)
+
+    def choose_pfp():
+        file = filedialog.askopenfilename(
             filetypes=[
-                ("Image Files", "*.png *.jpg *.jpeg"),
+                ("Image Files", "*.jpg;*.png;*.jpeg;*.gif"),
                 ("All Files", "*.*")
             ]
         )
-        if fp:
-            selected_path.set(fp)
- 
-    make_button(win, "Choose Image", pick_image, w=20)
- 
- 
-    # -------------------------
-    # SAVE PFP
-    # -------------------------
-    def save_pfp():
-        path = selected_path.get()
-        if path == "No file selected":
-            messagebox.showerror("Error", "Choose an image first.")
+        if not file:
             return
- 
-        try:
-            # Save PFP as USERNAME.png
-            new_path = f"pfp/{CURRENT_USER}.png"
-            img = Image.open(path)
-            img = img.resize((128, 128))
-            img.save(new_path)
- 
-            cur.execute("UPDATE users SET pfp=? WHERE username=?",
-                        (new_path, CURRENT_USER))
-            DB.commit()
- 
-            messagebox.showinfo("Success", "Profile picture updated!")
- 
-        except Exception as e:
-            messagebox.showerror("Error", f"Could not save PFP:\n{e}")
- 
-    make_button(win, "Save Profile Picture", save_pfp, w=20)
- 
+
+        dest_path = os.path.join("pfp", f"{CURRENT_USER}.png")
+
+        # Save image as PNG
+        img = Image.open(file)
+        img.save(dest_path)
+
+        messagebox.showinfo("Success", "Profile picture updated!")
+        win.destroy()
+
+    tk.Button(
+        win,
+        text="Choose File",
+        width=18,
+        height=2,
+        bg=BTN,
+        fg="white",
+        activebackground=BTN_HOVER,
+        command=choose_pfp
+    ).pack(pady=30)
 # ================================================================
-# PART 8 — SNAKE GAME WINDOW
+# PART J — SNAKE GAME
 # ================================================================
- 
+
 def open_snake_game():
     game = tk.Toplevel()
     game.title("Snake Game")
     game.geometry("520x560")
     game.configure(bg=BG)
     game.resizable(False, False)
- 
+
     W, H = 500, 500
     SIZE = 20
- 
+
     tk.Label(
         game,
         text="Snake Game",
         fg="white",
         bg=BG,
-        font=("Segoe UI", 20, "bold")
-    ).pack(pady=5)
- 
-    canvas = tk.Canvas(game, width=W, height=H, bg="black")
+        font=("Segoe UI", 22, "bold")
+    ).pack(pady=10)
+
+    canvas = tk.Canvas(game, width=W, height=H, bg="black", highlightthickness=0)
     canvas.pack()
- 
-    # Snake starting position
+
     snake = [(100, 100), (80, 100), (60, 100)]
     direction = "RIGHT"
- 
+
     import random
- 
+
     def spawn_food():
-        return (random.randint(0, (W//SIZE)-1) * SIZE,
-                random.randint(0, (H//SIZE)-1) * SIZE)
- 
+        return (
+            random.randint(0, (W // SIZE) - 1) * SIZE,
+            random.randint(0, (H // SIZE) - 1) * SIZE
+        )
+
     food = spawn_food()
     score = 0
- 
-    # -------------------------------------------------------
-    # Draw everything
-    # -------------------------------------------------------
+
     def draw():
         canvas.delete("all")
- 
-        # Draw snake
         for x, y in snake:
-            canvas.create_rectangle(x, y, x+SIZE, y+SIZE, fill="green")
- 
-        # Draw food
+            canvas.create_rectangle(x, y, x + SIZE, y + SIZE, fill="lime")
         fx, fy = food
-        canvas.create_oval(fx, fy, fx+SIZE, fy+SIZE, fill="red")
- 
-        # Score
+        canvas.create_oval(fx, fy, fx + SIZE, fy + SIZE, fill="red")
         canvas.create_text(10, 10, anchor="nw", fill="white",
-                           font=("Segoe UI", 14),
-                           text=f"Score: {score}")
- 
-    # -------------------------------------------------------
-    # Game loop
-    # -------------------------------------------------------
-    def move():
+                           font=("Segoe UI", 14), text=f"Score: {score}")
+
+    def tick():
         nonlocal food, score, direction
- 
+
         x, y = snake[0]
- 
-        if direction == "UP":    y -= SIZE
-        if direction == "DOWN":  y += SIZE
-        if direction == "LEFT":  x -= SIZE
-        if direction == "RIGHT": x += SIZE
- 
+        if direction == "UP": y -= SIZE
+        elif direction == "DOWN": y += SIZE
+        elif direction == "LEFT": x -= SIZE
+        elif direction == "RIGHT": x += SIZE
+
         new_head = (x, y)
- 
-        # Wall collision
-        if x < 0 or x >= W or y < 0 or y >= H:
+
+        # Wall / Self collision
+        if x < 0 or x >= W or y < 0 or y >= H or new_head in snake:
             messagebox.showinfo("Game Over", f"Final Score: {score}")
             game.destroy()
             return
- 
-        # Self collision
-        if new_head in snake:
-            messagebox.showinfo("Game Over", f"Final Score: {score}")
-            game.destroy()
-            return
- 
+
         snake.insert(0, new_head)
- 
-        # Food eaten
+
+        # Food collision
         if new_head == food:
             score += 1
             food = spawn_food()
         else:
             snake.pop()
- 
+
         draw()
-        game.after(100, move)
- 
-    # -------------------------------------------------------
-    # Keyboard controls
-    # -------------------------------------------------------
+        game.after(100, tick)
+
     def key(event):
         nonlocal direction
- 
         k = event.keysym.upper()
- 
         if k in ("W", "UP") and direction != "DOWN":
             direction = "UP"
         elif k in ("S", "DOWN") and direction != "UP":
@@ -1123,25 +911,36 @@ def open_snake_game():
             direction = "LEFT"
         elif k in ("D", "RIGHT") and direction != "LEFT":
             direction = "RIGHT"
- 
+
     game.bind("<Key>", key)
- 
     draw()
-    move()
+    tick()
 # ================================================================
-# PART 9 — FINAL STARTUP (START SERVER + OPEN LOGIN)
+# PART K — STARTUP SEQUENCE
 # ================================================================
- 
-def start_servers():
-    # Run Flask + Socket.IO in background
-    t = threading.Thread(target=start_flask_server, daemon=True)
-    t.start()
-    time.sleep(1.5)  # give server time to start
- 
- 
+
+def main_startup():
+    root = tk.Tk()
+    root.withdraw()  # Hide base window
+
+    # Start server if possible
+    start_server()
+
+    # Connect as client if not server
+    connect_to_server()
+
+    # Start non-blocking loops
+    server_check_messages(root)
+    client_check_messages(root)
+
+    # Open Login Screen
+    open_login_window(root)
+
+    root.mainloop()
+
+
 if __name__ == "__main__":
-    start_servers()
-    open_login()  # start GUI</p>
+    main_startup()</p>
     </div>
   </div>
 </div>
@@ -1266,3 +1065,4 @@ function redirectGame(game){
 
 
 <script type="text/javascript">window.$crisp=[];window.CRISP_WEBSITE_ID="49cbe588-16a0-40ad-b50b-844419c11121";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();</script>
+
