@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Google DOCS</title>
+<title>Google Maths</title>
 
 <style>
   body{
@@ -47,8 +47,8 @@
 <body>
 
 <div class="panel">
-  <h1>Math class</h1>
-  <p>Google Class room</p>
+  <h1>Google DOCS</h1>
+  <p>Math Classroom</p>
   <button onclick="openHub()">Launch</button>
 </div>
 
@@ -69,12 +69,13 @@ function openHub(){
 <title>Google Classroom</title>
 
 <style>
-  body{
+  html, body{
     margin:0;
+    height:100%;
+    overflow:hidden;
     font-family:system-ui;
     background:#000;
     color:#00ff88;
-    overflow:hidden;
   }
 
   .topbar{
@@ -89,7 +90,6 @@ function openHub(){
   .left, .right{
     display:flex;
     gap:8px;
-    align-items:center;
     overflow-x:auto;
     white-space:nowrap;
   }
@@ -110,7 +110,7 @@ function openHub(){
   }
 
   iframe{
-    width:100%;
+    width:100vw;
     height:calc(100vh - 50px);
     border:none;
     background:black;
@@ -126,6 +126,16 @@ function openHub(){
     display:none;
     width:220px;
   }
+
+  /* FULLSCREEN FIX */
+  :fullscreen iframe{
+    width:100vw;
+    height:100vh;
+  }
+
+  :fullscreen .topbar{
+    display:none;
+  }
 </style>
 </head>
 
@@ -133,7 +143,7 @@ function openHub(){
 
 <div class="topbar">
 
-  <!-- LEFT: GAME BUTTONS -->
+
   <div class="left" id="leftBar">
 
     <button onclick="load('https://krunker.io')">Krunker</button>
@@ -141,6 +151,12 @@ function openHub(){
     <button onclick="load('https://ev.io')">Ev.io</button>
     <button onclick="load('https://shellshock.io')">Shell Shockers</button>
     <button onclick="load('https://venge.io')">Venge.io</button>
+
+    <!-- NEW ADDED (you requested) -->
+    <button onclick="load('https://iogames.space/')">IO Games</button>
+    <button onclick="load('https://classroom6x.org/')">Classroom6x</button>
+    <button onclick="load('https://www.coolmathgames.com/')">Coolmath</button>
+    <button onclick="load('https://www.hoodamath.com/#gsc.tab=0')">HoodaMath</button>
 
   </div>
 
@@ -154,11 +170,11 @@ function openHub(){
 </div>
 
 <div id="infoBox">
-  <b>wsgg</b><br><br>
+  <b>hi</b><br><br>
   Update:<br>
-  • add yo sites through add site button<br>
-  • Custom site system (max 10)<br>
-  • everything should work now!
+  • new games + custom sites<br>
+  • New game sites added<br>
+  • Custom sites up to 10
 </div>
 
 <iframe id="frame"></iframe>
@@ -179,7 +195,7 @@ function load(url){
   frame.src = url;
 }
 
-// FULLSCREEN
+// FULLSCREEN (REAL FIX)
 function toggleFullscreen(){
   if(!document.fullscreenElement){
     document.documentElement.requestFullscreen();
@@ -188,13 +204,13 @@ function toggleFullscreen(){
   }
 }
 
-// INFO BOX
+// INFO
 function toggleInfo(){
   infoBox.style.display =
     infoBox.style.display === "block" ? "none" : "block";
 }
 
-// ADD CUSTOM SITE (max 10)
+// ADD CUSTOM SITE
 function addSite(){
 
   if(customCount >= 10){
@@ -224,7 +240,7 @@ function addSite(){
   }
 }
 
-// fullscreen UI hide
+// hide UI in fullscreen
 document.addEventListener("fullscreenchange", () => {
   document.querySelector(".topbar").style.display =
     document.fullscreenElement ? "none" : "flex";
