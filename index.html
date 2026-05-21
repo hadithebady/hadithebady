@@ -1,227 +1,246 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Good Bye</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google DOCS</title>
 
 <style>
-*{
+  body{
     margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
-
-body{
-    font-family:'Inter',sans-serif;
-    background:#050505;
-    overflow:hidden;
     height:100vh;
     display:flex;
     justify-content:center;
     align-items:center;
+    background:#05070d;
+    font-family:system-ui,Arial;
     color:white;
-    position:relative;
-}
+  }
 
-/* Animated background */
-body::before{
-    content:"";
-    position:absolute;
-    width:200%;
-    height:200%;
-    background:
-        radial-gradient(circle at 20% 20%, #00ffee33 0%, transparent 20%),
-        radial-gradient(circle at 80% 40%, #8b5cf633 0%, transparent 20%),
-        radial-gradient(circle at 50% 80%, #00ff9933 0%, transparent 20%);
-    animation:bgMove 12s linear infinite;
-}
-
-@keyframes bgMove{
-    0%{
-        transform:translate(0,0) rotate(0deg);
-    }
-    100%{
-        transform:translate(-10%,-10%) rotate(360deg);
-    }
-}
-
-/* Floating particles */
-.particle{
-    position:absolute;
-    width:4px;
-    height:4px;
-    background:white;
-    border-radius:50%;
-    opacity:0.4;
-    animation:float linear infinite;
-}
-
-@keyframes float{
-    from{
-        transform:translateY(100vh);
-    }
-    to{
-        transform:translateY(-100vh);
-    }
-}
-
-.container{
-    position:relative;
-    z-index:2;
+  .panel{
     text-align:center;
-    padding:50px;
-    backdrop-filter:blur(12px);
-    background:rgba(255,255,255,0.04);
+    padding:30px;
     border:1px solid rgba(255,255,255,0.1);
-    border-radius:28px;
-    width:min(90%,800px);
-    box-shadow:
-        0 0 40px rgba(0,255,200,0.1),
-        0 0 80px rgba(139,92,246,0.08);
-    animation:fadeUp 1.5s ease;
-}
+    border-radius:16px;
+    background:rgba(255,255,255,0.03);
+    backdrop-filter: blur(10px);
+  }
 
-@keyframes fadeUp{
-    from{
-        opacity:0;
-        transform:translateY(40px);
-    }
-    to{
-        opacity:1;
-        transform:translateY(0);
-    }
-}
+  button{
+    padding:14px 20px;
+    margin:6px;
+    border:none;
+    border-radius:12px;
+    cursor:pointer;
+    background:linear-gradient(135deg,#3b82f6,#2563eb);
+    color:white;
+    font-size:14px;
+    transition:0.2s;
+  }
 
-h1{
-    font-size:clamp(3rem,8vw,6rem);
-    font-weight:800;
-    letter-spacing:4px;
-    margin-bottom:20px;
-    background:linear-gradient(90deg,#00ffee,#8b5cf6,#00ff99);
-    -webkit-background-clip:text;
-    -webkit-text-fill-color:transparent;
-    animation:glow 4s infinite alternate;
-}
-
-@keyframes glow{
-    from{
-        filter:drop-shadow(0 0 10px #00ffee88);
-    }
-    to{
-        filter:drop-shadow(0 0 30px #8b5cf6aa);
-    }
-}
-
-.subtitle{
-    font-size:1.2rem;
-    opacity:0.8;
-    margin-bottom:35px;
-    animation:pulse 3s infinite;
-}
-
-@keyframes pulse{
-    0%,100%{
-        opacity:0.6;
-    }
-    50%{
-        opacity:1;
-    }
-}
-
-.end{
-    font-size:2rem;
-    font-weight:700;
-    margin-bottom:30px;
-    color:#ffffff;
-}
-
-.link-box{
-    display:inline-block;
-    padding:18px 28px;
-    border-radius:18px;
-    background:rgba(255,255,255,0.06);
-    border:1px solid rgba(255,255,255,0.12);
-    transition:0.35s ease;
-    text-decoration:none;
-    color:#00ffee;
-    font-weight:600;
-    font-size:1rem;
-    overflow-wrap:anywhere;
-}
-
-.link-box:hover{
+  button:hover{
     transform:scale(1.05);
-    background:rgba(255,255,255,0.12);
-    box-shadow:0 0 25px rgba(0,255,238,0.3);
-}
-
-.scanline{
-    position:absolute;
-    width:100%;
-    height:4px;
-    background:rgba(255,255,255,0.05);
-    top:-10%;
-    animation:scan 6s linear infinite;
-}
-
-@keyframes scan{
-    0%{
-        top:-10%;
-    }
-    100%{
-        top:110%;
-    }
-}
-
-.footer{
-    margin-top:40px;
-    opacity:0.45;
-    font-size:0.9rem;
-    letter-spacing:2px;
-}
+  }
 </style>
 </head>
+
 <body>
 
-<div class="scanline"></div>
+<div class="panel">
+  <h1>Math class</h1>
+  <p>Google Class room</p>
+  <button onclick="openHub()">Launch</button>
+</div>
 
-<!-- Particles -->
 <script>
-for(let i=0;i<80;i++){
-    const p=document.createElement("div");
-    p.className="particle";
-    p.style.left=Math.random()*100+"vw";
-    p.style.animationDuration=(5+Math.random()*10)+"s";
-    p.style.opacity=Math.random();
-    p.style.transform=`scale(${Math.random()*2})`;
-    document.body.appendChild(p);
+function openHub(){
+
+  const w = window.open("", "_blank");
+  if(!w){
+    alert("Popup blocked");
+    return;
+  }
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Google Classroom</title>
+
+<style>
+  body{
+    margin:0;
+    font-family:system-ui;
+    background:#000;
+    color:#00ff88;
+    overflow:hidden;
+  }
+
+  .topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px;
+    background:rgba(0,0,0,0.95);
+    border-bottom:1px solid rgba(0,255,136,0.2);
+  }
+
+  .left, .right{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    overflow-x:auto;
+    white-space:nowrap;
+  }
+
+  button{
+    flex:0 0 auto;
+    padding:9px 12px;
+    border:1px solid rgba(0,255,136,0.3);
+    background:#050505;
+    color:#00ff88;
+    border-radius:10px;
+    cursor:pointer;
+    font-size:13px;
+  }
+
+  button:hover{
+    background:#00ff8820;
+  }
+
+  iframe{
+    width:100%;
+    height:calc(100vh - 50px);
+    border:none;
+    background:black;
+  }
+
+  #infoBox{
+    position:absolute;
+    top:60px;
+    left:10px;
+    padding:10px;
+    border:1px solid rgba(0,255,136,0.3);
+    background:#000;
+    display:none;
+    width:220px;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+
+  <!-- LEFT: GAME BUTTONS -->
+  <div class="left" id="leftBar">
+
+    <button onclick="load('https://krunker.io')">Krunker</button>
+    <button onclick="load('https://kour.io')">Kour.io</button>
+    <button onclick="load('https://ev.io')">Ev.io</button>
+    <button onclick="load('https://shellshock.io')">Shell Shockers</button>
+    <button onclick="load('https://venge.io')">Venge.io</button>
+
+  </div>
+
+  <!-- RIGHT: CONTROLS -->
+  <div class="right">
+    <button onclick="toggleFullscreen()">Fullscreen</button>
+    <button onclick="toggleInfo()">Info</button>
+    <button onclick="addSite()">+ Add Site</button>
+  </div>
+
+</div>
+
+<div id="infoBox">
+  <b>wsgg</b><br><br>
+  Update:<br>
+  • add yo sites through add site button<br>
+  • Custom site system (max 10)<br>
+  • everything should work now!
+</div>
+
+<iframe id="frame"></iframe>
+
+<script>
+
+let current = "";
+let customCount = 0;
+
+const frame = document.getElementById("frame");
+const infoBox = document.getElementById("infoBox");
+
+frame.src = "https://krunker.io";
+
+function load(url){
+  if(current === url) return;
+  current = url;
+  frame.src = url;
+}
+
+// FULLSCREEN
+function toggleFullscreen(){
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+// INFO BOX
+function toggleInfo(){
+  infoBox.style.display =
+    infoBox.style.display === "block" ? "none" : "block";
+}
+
+// ADD CUSTOM SITE (max 10)
+function addSite(){
+
+  if(customCount >= 10){
+    alert("Max 10 custom sites reached");
+    return;
+  }
+
+  const url = prompt("Enter website URL:");
+  if(!url) return;
+
+  try{
+    const fixed = new URL(url).href;
+
+    customCount++;
+    const name = "Custom" + customCount;
+
+    const btn = document.createElement("button");
+    btn.innerText = name;
+    btn.onclick = () => load(fixed);
+
+    document.getElementById("leftBar").appendChild(btn);
+
+    alert(name + " added");
+
+  } catch(e){
+    alert("Invalid URL");
+  }
+}
+
+// fullscreen UI hide
+document.addEventListener("fullscreenchange", () => {
+  document.querySelector(".topbar").style.display =
+    document.fullscreenElement ? "none" : "flex";
+});
+
+<\/script>
+
+</body>
+</html>
+`;
+
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
 }
 </script>
-
-<div class="container">
-    <h1>GOOD BYE</h1>
-
-    <div class="subtitle">
-        Locked in...
-    </div>
-
-    <div class="end">
-        THE END
-    </div>
-
-    <a class="link-box"
-       href="https://www.hadithebady.store/Terminal.html"
-       target="_blank">
-       Go to: https://www.hadithebady.store/Terminal.html to look coolll!!
-    </a>
-
-    <div class="footer">
-        shutting down...
-    </div>
-</div>
 
 </body>
 </html>
